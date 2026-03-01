@@ -1,6 +1,7 @@
 package websocket
 
 import (
+    "encoding/json"
     "log"
     "net/http"
     "sync"
@@ -85,6 +86,7 @@ func (h *ClipboardHandler) handleJoin(roomID string, clientID string, conn *webs
     h.mu.Unlock()
 
     log.Printf("Cliente %s unido a la sala %s", clientID, roomID)
+    h.broadcastUserList(roomID)
 }
 
 // handleUpdate retransmite las actualizaciones del portapapeles a otros clientes.
@@ -114,4 +116,25 @@ func (h *ClipboardHandler) handleDisconnect(roomID string, clientID string) {
     delete(h.conns, clientID)
     h.mu.Unlock()
     log.Printf("Cliente %s desconectado de la sala %s", clientID, roomID)
+    h.broadcastUserList(roomID)
+}
+
+// broadcastUserList envia a todos los clientes de una sala la lista actual de miembros.
+func (h *ClipboardHandler) broadcastUserList(roomID string) {
+    userList, err := h.roomService.GetRoomUsers(roomID)
+    if err != nil {
+        return
+    }
+
+    data, _ := json.Marshal(userList)
+    msg := domain.NewMessage(domain.TypeUserList, string(data), "SERVER")
+
+    h.mu.RLock()
+    defer h.mu.RUnlock()
+
+    for _, userID := range userList {
+        if conn, exists := h.conns[userID]; exists {
+            conn.WriteJSON(msg)
+        }
+    }
 }

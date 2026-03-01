@@ -10,6 +10,8 @@ const (
     TypeUpdate    MessageType = "UPDATE"
     // TypeError representa un mensaje de error enviado desde el servidor.
     TypeError     MessageType = "ERROR"
+    // TypeUserList se utiliza para enviar la lista de usuarios conectados en la sala.
+    TypeUserList  MessageType = "USER_LIST"
     // TypeHeartbeat se utiliza para mantener activa la conexion.
     TypeHeartbeat MessageType = "HEARTBEAT"
 )

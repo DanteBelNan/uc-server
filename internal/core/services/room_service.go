@@ -69,6 +69,27 @@ func (s *RoomService) LeaveRoom(roomID string, clientID string) {
     }
 }
 
+// GetRoomUsers devuelve la lista de IDs de todos los clientes en una sala.
+func (s *RoomService) GetRoomUsers(roomID string) ([]string, error) {
+    s.mu.RLock()
+    room, exists := s.rooms[roomID]
+    s.mu.RUnlock()
+
+    if !exists {
+        return nil, errors.New("la sala no existe")
+    }
+
+    room.Mu.RLock()
+    defer room.Mu.RUnlock()
+
+    users := make([]string, 0, len(room.Clients))
+    for clientID := range room.Clients {
+        users = append(users, clientID)
+    }
+
+    return users, nil
+}
+
 // BroadcastMessage envia un mensaje a todos los clientes de una sala excepto al emisor.
 // roomID: ID de la sala donde se enviara el mensaje.
 // msg: el mensaje a retransmitir.
