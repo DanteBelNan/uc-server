@@ -1,0 +1,18 @@
+# Binaries and executables
+/bin/
+/tmp/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Dependency directories
+vendor/
+
+# Environment variables
+.env
+*.env.*
+
+# Logs and temporary files
+*.log
+*.tmp
