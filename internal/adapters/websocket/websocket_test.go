@@ -55,7 +55,18 @@ func TestWebSocket_Integration(t *testing.T) {
     }
 
     // Pequena espera para asegurar el procesamiento de JOIN en el servidor
-    time.Sleep(50 * time.Millisecond)
+    time.Sleep(100 * time.Millisecond)
+
+    // El Cliente 2 primero recibira un mensaje de USER_LIST al unirse.
+    // Vamos a leer y validar que sea de tipo USER_LIST.
+    var userListMsg domain.Message
+    c2.SetReadDeadline(time.Now().Add(1 * time.Second))
+    if err := c2.ReadJSON(&userListMsg); err != nil {
+        t.Fatalf("Cliente 2 no recibio la lista de usuarios: %v", err)
+    }
+    if userListMsg.Type != domain.TypeUserList {
+        t.Errorf("Se esperaba USER_LIST, se obtuvo %s", userListMsg.Type)
+    }
 
     // Cliente 1 envia una actualizacion del portapapeles
     payload := "contenido compartido"
@@ -64,11 +75,11 @@ func TestWebSocket_Integration(t *testing.T) {
         t.Fatalf("Error al enviar UPDATE desde cliente 1: %v", err)
     }
 
-    // Cliente 2 deberia recibir la actualizacion
+    // Cliente 2 deberia recibir la actualizacion ahora
     var receivedMsg domain.Message
     c2.SetReadDeadline(time.Now().Add(1 * time.Second))
     if err := c2.ReadJSON(&receivedMsg); err != nil {
-        t.Fatalf("Cliente 2 no recibio el mensaje: %v", err)
+        t.Fatalf("Cliente 2 no recibio el mensaje de update: %v", err)
     }
 
     if receivedMsg.Payload != payload {
