@@ -41,7 +41,7 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   deploy:
-    name: 'Deploy to EC2'
+    name: 'Deploy via SSM'
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
@@ -52,21 +52,22 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
-    - name: Get EC2 Public IP
-      id: get-ip
+    - name: Get EC2 Instance ID
+      id: get-id
       run: |
-        IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=uc-prod-server" --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
-        echo "ip=$IP" >> $GITHUB_OUTPUT
+        ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=uc-prod-server" "Name=instance-state-name,Values=running" --query "Reservations[*].Instances[*].InstanceId" --output text)
+        echo "instance_id=$ID" >> $GITHUB_OUTPUT
 
-    - name: SSH and Update Container
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ steps.get-ip.outputs.ip }}
-        username: ec2-user
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com
-          docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/uc-server:latest
-          docker stop uc-server || true
-          docker rm uc-server || true
-          docker run -d --name uc-server -p 8080:8080 ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/uc-server:latest
+    - name: Execute Docker Commands via SSM
+      run: |
+        COMMAND="aws ecr get-login-password --region ${{ secrets.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION.amazonaws.com }} && \
+                 docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/uc-server:latest && \
+                 docker stop uc-server || true && \
+                 docker rm uc-server || true && \
+                 docker run -d --name uc-server -p 8080:8080 ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com/uc-server:latest"
+        
+        aws ssm send-command \
+          --instance-ids ${{ steps.get-id.outputs.instance_id }} \
+          --document-name "AWS-RunShellScript" \
+          --parameters "commands=['$COMMAND']" \
+          --region ${{ secrets.AWS_DEFAULT_REGION }}
